@@ -93,6 +93,20 @@
   @media (prefers-color-scheme: dark) { .segmented button[aria-pressed="true"] { background: #636366; } }
 
   /* ---------- Grouped inset lists ---------- */
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 8px 16px; font-size: 13px; color: var(--label-2); text-transform: uppercase; letter-spacing: -0.08px; min-height: 32px; }
+  .sort { position: relative; display: inline-flex; align-items: center; gap: 4px; color: var(--tint); font-size: 15px; text-transform: none; letter-spacing: -0.24px; padding: 4px 8px; border-radius: 8px; }
+  .sort svg { width: 12px; height: 12px; }
+  .sort select { position: absolute; inset: 0; opacity: 0; width: 100%; font-size: 16px; }
+  .sort:active { background: var(--fill); }
+  .active-filters { display: flex; gap: 8px; overflow-x: auto; margin: -8px -16px 14px; padding: 0 16px; scrollbar-width: none; }
+  .active-filters::-webkit-scrollbar { display: none; }
+  .chip--active { flex: none; background: color-mix(in srgb, var(--tint) 14%, transparent); color: var(--tint); font-weight: 500; }
+  .chip--active span { font-size: 17px; line-height: 1; margin-left: 2px; opacity: .8; }
+  .rank {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums;
+    color: var(--tint); background: color-mix(in srgb, var(--tint) 12%, transparent); border-radius: 5px; padding: 1px 5px; margin-right: 6px;
+    vertical-align: 1px;
+  }
   .section-header { font-size: 13px; text-transform: uppercase; color: var(--label-2); letter-spacing: -0.08px; padding: 0 16px 7px; }
   .section-footer { font-size: 13px; color: var(--label-2); letter-spacing: -0.08px; padding: 7px 16px 0; }
   .group { background: var(--cell); border-radius: 10px; overflow: hidden; margin-bottom: 30px; }
@@ -231,6 +245,8 @@ const state = {
   query: '',
   filters: store.get('filters', { types: [], difficulty: [], players: null, best: null, sort: 'name' }),
 };
+if (state.filters.sort === 'price') state.filters.sort = 'priceAsc';
+const SORTS = { name: 'Nombre', rank: 'Ranking BGG', priceAsc: 'Precio: más barato', priceDesc: 'Precio: más caro', recent: 'Añadidos recientemente' };
 const token = () => store.get('token', '');
 const repo = () => store.get('repo', DEFAULT_REPO);
 const liveGames = () => state.games.filter(g => !g.deleted);
@@ -345,7 +361,8 @@ function visibleGames() {
   );
   const by = {
     name: (a, b) => a.name.localeCompare(b.name, 'es'),
-    price: (a, b) => (bestPrice(a)?.price ?? 1e9) - (bestPrice(b)?.price ?? 1e9),
+    priceAsc: (a, b) => (bestPrice(a)?.price ?? 1e9) - (bestPrice(b)?.price ?? 1e9),
+    priceDesc: (a, b) => (bestPrice(b)?.price ?? -1) - (bestPrice(a)?.price ?? -1),
     recent: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''),
     rank: (a, b) => (a.bggRank || 1e9) - (b.bggRank || 1e9),
   }[f.sort] || ((a, b) => a.name.localeCompare(b.name, 'es'));
@@ -362,7 +379,6 @@ function thumbHTML(g, cls = 'thumb') {
 
 function subtitle(g) {
   const parts = [];
-  if (g.bggRank) parts.push(`#${g.bggRank.toLocaleString('es-ES')} BGG`);
   if ((g.types || []).length) parts.push(g.types.join(', '));
   if (g.minPlayers || g.maxPlayers) {
     const min = g.minPlayers || 1, max = g.maxPlayers;
@@ -384,7 +400,7 @@ function render() {
       ${thumbHTML(g)}
       <div class="cell__main">
         <div class="cell__title"><span>${esc(g.name)}</span>${g.owned && state.view === 'all' ? ICON.check : ''}</div>
-        <div class="cell__sub">${esc(subtitle(g)) || '&nbsp;'}</div>
+        <div class="cell__sub">${g.bggRank ? `<span class="rank" title="Ranking BGG">#${g.bggRank.toLocaleString('es-ES')}</span>` : ''}${esc(subtitle(g)) || '&nbsp;'}</div>
       </div>
       ${bp && !g.owned ? `<div class="price"><b>${euro(bp.price)}</b><small>${bp.store}${isSpanish(bp.lang) ? '' : ` · <span class="lang-warn">${LANGS[bp.lang] || bp.lang}</span>`}</small></div>` : ''}
       ${ICON.chev}
@@ -397,7 +413,15 @@ function render() {
     const want = games.filter(g => !g.owned), own = games.filter(g => g.owned);
     listHTML = [[`Me interesa`, want], [`Lo tengo`, own]].filter(([, l]) => l.length)
       .map(([h, l]) => `<div class="section-header">${h} · ${l.length}</div><div class="group">${l.map(row).join('')}</div>`).join('');
-  } else listHTML = `<div class="section-header">${games.length} ${games.length === 1 ? 'juego' : 'juegos'}</div><div class="group">${games.map(row).join('')}</div>`;
+  } else listHTML = `<div class="group">${games.map(row).join('')}</div>`;
+  const grouped = state.view === 'all' && state.filters.sort === 'name';
+  const f = state.filters;
+  const activeChips = [
+    ...f.types.map(x => ['types', x, x]),
+    ...f.difficulty.map(x => ['difficulty', x, 'Dificultad ' + x.toLowerCase()]),
+    ...(f.players ? [['players', f.players, `Para ${countLabel(f.players)} j.`]] : []),
+    ...(f.best ? [['best', f.best, `Mejor con ${countLabel(f.best)}`]] : []),
+  ];
 
   app.innerHTML = `
     <header class="navbar">
@@ -416,9 +440,20 @@ function render() {
       <div class="segmented" role="tablist">
         ${[['all', 'Todos'], ['want', 'Me interesa'], ['own', 'Lo tengo']].map(([v, l]) => `<button data-view="${v}" aria-pressed="${state.view === v}">${l}</button>`).join('')}
       </div>
+      ${activeChips.length ? `<div class="active-filters">${activeChips.map(([k, v, l]) => `<button class="chip chip--active" data-unfilter="${k}" data-val="${esc(v)}">${esc(l)}<span aria-hidden="true">×</span></button>`).join('')}</div>` : ''}
+      ${total ? `<div class="toolbar">
+        <span>${grouped ? '' : `${games.length} ${games.length === 1 ? 'juego' : 'juegos'}`}</span>
+        <label class="sort">
+          <span>${SORTS[f.sort] || 'Nombre'}</span>
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 1.5l3 3M3 7.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <select id="sort" aria-label="Ordenar por">${Object.entries(SORTS).map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        </label>
+      </div>` : ''}
       <div id="list">${listHTML}</div>
       ${statusHTML()}
     </main>`;
+  const sortSel = $('#sort');
+  if (sortSel) sortSel.onchange = () => { state.filters.sort = sortSel.value; store.set('filters', state.filters); render(); };
   const q = $('#q');
   q.oninput = () => { state.query = q.value; const pos = q.selectionStart; render(); const nq = $('#q'); nq.focus(); nq.setSelectionRange(pos, pos); };
   onScroll();
@@ -427,9 +462,14 @@ function onScroll() { $('.navbar')?.classList.toggle('scrolled', window.scrollY 
 window.addEventListener('scroll', onScroll, { passive: true });
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-act],[data-view],[data-open]');
+  const t = e.target.closest('[data-act],[data-view],[data-open],[data-unfilter]');
   if (!t) return;
-  if (t.dataset.view) { state.view = t.dataset.view; store.set('view', state.view); render(); }
+  if (t.dataset.unfilter) {
+    const f = state.filters, k = t.dataset.unfilter;
+    if (Array.isArray(f[k])) f[k] = f[k].filter(x => String(x) !== t.dataset.val); else f[k] = null;
+    store.set('filters', f); render();
+  }
+  else if (t.dataset.view) { state.view = t.dataset.view; store.set('view', state.view); render(); }
   else if (t.dataset.open) openGame(state.games.find(g => g.id === t.dataset.open));
   else if (t.dataset.act === 'new') openGame(null);
   else if (t.dataset.act === 'filters') openFilters();
@@ -607,10 +647,6 @@ function openFilters() {
   const f = structuredClone(state.filters);
   const toggle = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
   const body = () => `
-    <div class="section-header">Ordenar por</div>
-    <div class="segmented">
-      ${[['name', 'Nombre'], ['rank', 'Ranking'], ['price', 'Precio'], ['recent', 'Nuevos']].map(([v, l]) => `<button data-sort="${v}" aria-pressed="${f.sort === v}">${l}</button>`).join('')}
-    </div>
     <div class="section-header">Tipo</div>
     <div class="group"><div class="chips">${allTypes().map(t => chip(t, f.types.includes(t), `data-type="${esc(t)}"`)).join('')}</div></div>
     <div class="section-header">Dificultad</div>
@@ -631,8 +667,7 @@ function openFilters() {
   };
   api.el.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
-    if (t.dataset.sort) f.sort = t.dataset.sort;
-    else if (t.dataset.type) f.types = toggle(f.types, t.dataset.type);
+    if (t.dataset.type) f.types = toggle(f.types, t.dataset.type);
     else if (t.dataset.diff) f.difficulty = toggle(f.difficulty, t.dataset.diff);
     else if (t.dataset.players) f.players = f.players === +t.dataset.players ? null : +t.dataset.players;
     else if (t.dataset.best) f.best = f.best === +t.dataset.best ? null : +t.dataset.best;
