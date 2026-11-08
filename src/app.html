@@ -218,7 +218,10 @@ const VERSION = '/*VERSION*/';
 const DEFAULT_REPO = 'orzull/boardgames-data';
 const DATA_PATH = 'games.json';
 
-const TYPES = ['Euro', 'Party', 'Familiar', 'Cooperativo', 'Temático', 'Abstracto', 'Filler', 'Deckbuilding', 'Roll & write', 'Legacy', 'Wargame', 'Puzzle', 'Deducción', 'Draft', 'Expansión'];
+// Simple categories, thought from "what do I feel like playing / buying"
+const TYPES = ['Solitario', 'Para dos', 'Cooperativo', 'Estrategia', 'Cartas', 'Fácil de sacar', 'Grupos', 'Detectives', 'Aventura', 'Expansión'];
+const TYPE_ICON = { 'Solitario': '🧍', 'Para dos': '👫', 'Cooperativo': '🤝', 'Estrategia': '🏰', 'Cartas': '🃏', 'Fácil de sacar': '🎉', 'Grupos': '👥', 'Detectives': '🔎', 'Aventura': '🗺️', 'Expansión': '➕' };
+const typeLabel = x => (TYPE_ICON[x] ? TYPE_ICON[x] + ' ' : '') + x;
 // Edition language per store. Spanish (or multilingual with Spanish, or no text) counts as "in Spanish".
 const LANGS = { es: 'Español', 'es/en': 'Español + inglés', ind: 'Sin texto', en: 'Inglés', fr: 'Francés', it: 'Italiano', de: 'Alemán' };
 const isSpanish = l => !l || l === 'es' || l === 'es/en' || l === 'ind';
@@ -256,6 +259,8 @@ const state = {
   filters: store.get('filters', { types: [], difficulty: [], players: null, best: null, sort: 'name' }),
 };
 if (state.filters.sort === 'price') state.filters.sort = 'priceAsc';
+// old category names (Euro, Party, Filler…) no longer exist
+state.filters.types = state.filters.types.filter(x => TYPES.includes(x) || state.games.some(g => (g.types || []).includes(x)));
 const SORTS = { mine: 'Mi recomendación', name: 'Nombre', rank: 'Ranking BGG', priceAsc: 'Precio: más barato', priceDesc: 'Precio: más caro', recent: 'Añadidos recientemente' };
 // Claude's buying advice: score 0–100 → stage
 const TIERS = [['Comprar ya', 85, 'buy'], ['Siguiente', 70, 'next'], ['Más adelante', 55, 'later'], ['Dudoso', 0, 'doubt']];
@@ -367,7 +372,7 @@ function visibleGames() {
   let list = liveGames().filter(g =>
     (state.view === 'all' || (state.view === 'own') === !!g.owned) &&
     (!q || g.name.toLowerCase().includes(q) || (g.originalName || '').toLowerCase().includes(q) || (g.types || []).some(t => t.toLowerCase().includes(q))) &&
-    (!f.types.length || f.types.some(t => (g.types || []).includes(t))) &&
+    (!f.types.length || f.types.every(t => (g.types || []).includes(t))) &&
     (!f.difficulty.length || f.difficulty.includes(g.difficulty)) &&
     (!f.players || ((g.minPlayers || 1) <= f.players && (f.players >= 6 ? (g.maxPlayers || 0) >= 6 : (g.maxPlayers || 99) >= f.players))) &&
     (!f.best || (g.bestWith || []).includes(f.best))
@@ -393,7 +398,7 @@ function thumbHTML(g, cls = 'thumb') {
 
 function subtitle(g) {
   const parts = [];
-  if ((g.types || []).length) parts.push(g.types.join(', '));
+  if ((g.types || []).length) parts.push(g.types.slice(0, 2).join(', '));
   if (g.minPlayers || g.maxPlayers) {
     const min = g.minPlayers || 1, max = g.maxPlayers;
     parts.push(max && max !== min ? `${min}–${countLabel(max)} j.` : `${countLabel(min)} j.`);
@@ -436,7 +441,7 @@ function render() {
   const grouped = (state.view === 'all' && state.filters.sort === 'name') || state.filters.sort === 'mine';
   const f = state.filters;
   const activeChips = [
-    ...f.types.map(x => ['types', x, x]),
+    ...f.types.map(x => ['types', x, typeLabel(x)]),
     ...f.difficulty.map(x => ['difficulty', x, 'Dificultad ' + x.toLowerCase()]),
     ...(f.players ? [['players', f.players, `Para ${countLabel(f.players)} j.`]] : []),
     ...(f.best ? [['best', f.best, `Mejor con ${countLabel(f.best)}`]] : []),
@@ -584,9 +589,9 @@ function openGame(game) {
       <button data-owned="1" aria-pressed="${!!g.owned}">Lo tengo</button>
     </div>
 
-    <div class="section-header">Tipo</div>
+    <div class="section-header">Categorías</div>
     <div class="group"><div class="chips">
-      ${allTypes().map(t => chip(t, g.types.includes(t), `data-type="${esc(t)}"`)).join('')}
+      ${allTypes().map(t => chip(typeLabel(t), g.types.includes(t), `data-type="${esc(t)}"`)).join('')}
       <button class="chip chip--add" data-addtype>+ Otro</button>
     </div></div>
 
@@ -647,7 +652,7 @@ function openGame(game) {
     if (t.dataset.owned) keepScroll(() => { g.owned = t.dataset.owned === '1'; });
     else if (t.dataset.type) keepScroll(() => { const x = t.dataset.type; g.types = g.types.includes(x) ? g.types.filter(y => y !== x) : [...g.types, x]; });
     else if (t.hasAttribute('data-addtype')) {
-      const x = (prompt('Nuevo tipo de juego') || '').trim();
+      const x = (prompt('Nueva categoría') || '').trim();
       if (x) keepScroll(() => { if (!g.types.includes(x)) g.types.push(x); });
     }
     else if (t.dataset.diff) keepScroll(() => { g.difficulty = g.difficulty === t.dataset.diff ? '' : t.dataset.diff; });
@@ -671,15 +676,15 @@ function openFilters() {
   const f = structuredClone(state.filters);
   const toggle = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
   const body = () => `
-    <div class="section-header">Tipo</div>
-    <div class="group"><div class="chips">${allTypes().map(t => chip(t, f.types.includes(t), `data-type="${esc(t)}"`)).join('')}</div></div>
+    <div class="section-header">Categoría</div>
+    <div class="group"><div class="chips">${allTypes().map(t => chip(typeLabel(t), f.types.includes(t), `data-type="${esc(t)}"`)).join('')}</div></div>
     <div class="section-header">Dificultad</div>
     <div class="group"><div class="chips">${DIFFICULTY.map(d => chip(d, f.difficulty.includes(d), `data-diff="${d}"`)).join('')}</div></div>
     <div class="section-header">Se puede jugar con</div>
     <div class="group"><div class="chips">${COUNTS.map(c => chip(countLabel(c), f.players === c, `data-players="${c}"`)).join('')}</div></div>
     <div class="section-header">Mejor con</div>
     <div class="group"><div class="chips">${COUNTS.map(c => chip(countLabel(c), f.best === c, `data-best="${c}"`)).join('')}</div></div>
-    <div class="section-footer" style="margin:-23px 0 30px">Los tipos muestran juegos que tengan cualquiera de los elegidos.</div>`;
+    <div class="section-footer" style="margin:-23px 0 30px">Si eliges varias categorías, salen los juegos que tienen todas.</div>`;
   const api = openSheet({
     title: 'Filtros', left: 'Restablecer', body,
     onLeft: () => {},  // backdrop tap = keep filters as they were
