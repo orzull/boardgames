@@ -112,7 +112,8 @@
   .cell__title { display: flex; align-items: center; gap: 6px; }
   .cell__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cell__sub { font-size: 15px; color: var(--label-2); letter-spacing: -0.24px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cell__value { color: var(--label-2); text-align: right; flex: none; }
+  .cell__value { color: var(--label-2); text-align: right; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  a.cell { color: var(--label); }
   .chev { width: 8px; height: 13px; flex: none; color: var(--label-3); }
   .owned-dot { width: 18px; height: 18px; flex: none; color: var(--green); }
   .price { text-align: right; flex: none; line-height: 1.15; }
@@ -346,6 +347,7 @@ function visibleGames() {
     name: (a, b) => a.name.localeCompare(b.name, 'es'),
     price: (a, b) => (bestPrice(a)?.price ?? 1e9) - (bestPrice(b)?.price ?? 1e9),
     recent: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''),
+    rank: (a, b) => (a.bggRank || 1e9) - (b.bggRank || 1e9),
   }[f.sort] || ((a, b) => a.name.localeCompare(b.name, 'es'));
   return list.sort(by);
 }
@@ -360,6 +362,7 @@ function thumbHTML(g, cls = 'thumb') {
 
 function subtitle(g) {
   const parts = [];
+  if (g.bggRank) parts.push(`#${g.bggRank.toLocaleString('es-ES')} BGG`);
   if ((g.types || []).length) parts.push(g.types.join(', '));
   if (g.minPlayers || g.maxPlayers) {
     const min = g.minPlayers || 1, max = g.maxPlayers;
@@ -505,6 +508,13 @@ function openGame(game) {
       <div class="cell"><input class="field field--left" data-orig placeholder="Nombre original (opcional)" value="${esc(g.originalName || '')}" autocomplete="off"></div>
       <div class="cell"><input class="field field--left" type="url" data-image placeholder="URL de la imagen (opcional)" value="${esc(g.image || '')}" autocapitalize="off" autocorrect="off"></div>
     </div>
+    ${g.bggId ? `<div class="group">
+      <a class="cell" href="https://boardgamegeek.com/boardgame/${g.bggId}" target="_blank" rel="noopener">
+        <span class="cell__label">BGG</span>
+        <span class="cell__value">${[g.bggRank ? '#' + g.bggRank.toLocaleString('es-ES') : 'Sin ranking', g.bggRating ? '★ ' + g.bggRating.toLocaleString('es-ES') : '', g.bggWeight ? 'peso ' + g.bggWeight.toFixed(1).replace('.', ',') + '/5' : ''].filter(Boolean).join(' · ')}</span>
+        ${ICON.chev}
+      </a>
+    </div>` : ''}
     <div class="segmented">
       <button data-owned="0" aria-pressed="${!g.owned}">Me interesa</button>
       <button data-owned="1" aria-pressed="${!!g.owned}">Lo tengo</button>
@@ -599,7 +609,7 @@ function openFilters() {
   const body = () => `
     <div class="section-header">Ordenar por</div>
     <div class="segmented">
-      ${[['name', 'Nombre'], ['price', 'Precio'], ['recent', 'Recientes']].map(([v, l]) => `<button data-sort="${v}" aria-pressed="${f.sort === v}">${l}</button>`).join('')}
+      ${[['name', 'Nombre'], ['rank', 'Ranking'], ['price', 'Precio'], ['recent', 'Nuevos']].map(([v, l]) => `<button data-sort="${v}" aria-pressed="${f.sort === v}">${l}</button>`).join('')}
     </div>
     <div class="section-header">Tipo</div>
     <div class="group"><div class="chips">${allTypes().map(t => chip(t, f.types.includes(t), `data-type="${esc(t)}"`)).join('')}</div></div>
