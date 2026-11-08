@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="es" data-app="boardgames">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mis juegos">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Mis juegos</title>
+<style>
+  /* iOS system colours */
+  :root {
+    --bg: #f2f2f7;
+    --cell: #ffffff;
+    --cell-2: #f2f2f7;
+    --sep: rgba(60, 60, 67, .18);
+    --label: #000000;
+    --label-2: rgba(60, 60, 67, .6);
+    --label-3: rgba(60, 60, 67, .3);
+    --fill: rgba(120, 120, 128, .12);
+    --fill-2: rgba(120, 120, 128, .2);
+    --bar: rgba(249, 249, 249, .86);
+    --tint: #5856d6;
+    --green: #34c759;
+    --red: #ff3b30;
+    --orange: #ff9500;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --cell: #1c1c1e; --cell-2: #2c2c2e;
+      --sep: rgba(84, 84, 88, .6);
+      --label: #ffffff; --label-2: rgba(235, 235, 245, .6); --label-3: rgba(235, 235, 245, .3);
+      --fill: rgba(118, 118, 128, .24); --fill-2: rgba(118, 118, 128, .32);
+      --bar: rgba(22, 22, 24, .86);
+      --tint: #5e5ce6; --green: #30d158; --red: #ff453a; --orange: #ff9f0a;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--label); }
+  body {
+    font: 17px/1.29 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: -0.41px; -webkit-font-smoothing: antialiased;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button { font: inherit; color: inherit; letter-spacing: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+  a { color: var(--tint); text-decoration: none; }
+  .page { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+  .hidden { display: none !important; }
+
+  /* ---------- Navigation bar ---------- */
+  .navbar {
+    position: sticky; top: 0; z-index: 10; padding-top: env(safe-area-inset-top);
+    background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: .5px solid transparent; transition: border-color .2s;
+  }
+  .navbar.scrolled { border-bottom-color: var(--sep); }
+  .navbar__row { max-width: 680px; margin: 0 auto; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+  .navbar__small { font-weight: 600; opacity: 0; transition: opacity .2s; }
+  .navbar.scrolled .navbar__small { opacity: 1; }
+  .bar-btn { color: var(--tint); font-size: 17px; min-width: 44px; height: 44px; display: inline-flex; align-items: center; gap: 4px; }
+  .bar-btn--right { justify-content: flex-end; }
+  .bar-btn svg { width: 22px; height: 22px; }
+  .bar-btn .badge {
+    min-width: 18px; height: 18px; border-radius: 9px; background: var(--tint); color: #fff;
+    font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; padding: 0 5px; letter-spacing: 0;
+  }
+  .large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: .37px; margin: 2px 0 8px; }
+
+  /* ---------- Search + segmented ---------- */
+  .search {
+    display: flex; align-items: center; gap: 6px; height: 36px; border-radius: 10px; background: var(--fill);
+    padding: 0 8px; color: var(--label-2); margin-bottom: 12px;
+  }
+  .search svg { width: 16px; height: 16px; flex: none; }
+  .search input { flex: 1; min-width: 0; border: 0; background: none; outline: 0; color: var(--label); font-size: 17px; }
+  .search input::placeholder { color: var(--label-2); }
+  .segmented {
+    display: flex; background: var(--fill); border-radius: 9px; padding: 2px; gap: 2px; margin-bottom: 18px;
+  }
+  .segmented button {
+    flex: 1; height: 28px; border-radius: 7px; font-size: 13px; font-weight: 500; letter-spacing: -0.08px; white-space: nowrap;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--cell); font-weight: 600; box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); }
+  @media (prefers-color-scheme: dark) { .segmented button[aria-pressed="true"] { background: #636366; } }
+
+  /* ---------- Grouped inset lists ---------- */
+  .section-header { font-size: 13px; text-transform: uppercase; color: var(--label-2); letter-spacing: -0.08px; padding: 0 16px 7px; }
+  .section-footer { font-size: 13px; color: var(--label-2); letter-spacing: -0.08px; padding: 7px 16px 0; }
+  .group { background: var(--cell); border-radius: 10px; overflow: hidden; margin-bottom: 30px; }
+  .group + .section-footer { margin-top: -23px; margin-bottom: 30px; }
+  .cell { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 11px 16px; width: 100%; text-align: left; }
+  .cell + .cell::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--sep); }
+  button.cell:active, a.cell:active { background: var(--fill-2); }
+  .cell__main { flex: 1; min-width: 0; }
+  .cell__title { display: flex; align-items: center; gap: 6px; }
+  .cell__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell__sub { font-size: 15px; color: var(--label-2); letter-spacing: -0.24px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell__value { color: var(--label-2); text-align: right; flex: none; }
+  .chev { width: 8px; height: 13px; flex: none; color: var(--label-3); }
+  .owned-dot { width: 18px; height: 18px; flex: none; color: var(--green); }
+  .price { text-align: right; flex: none; line-height: 1.15; }
+  .price b { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .price small { font-size: 12px; color: var(--label-2); letter-spacing: 0; }
+  .empty { text-align: center; color: var(--label-2); padding: 60px 20px; }
+  .empty b { display: block; color: var(--label); font-size: 20px; margin-bottom: 6px; }
+
+  .status { text-align: center; font-size: 12px; color: var(--label-2); letter-spacing: 0; padding: 0 0 30px; }
+  .status--warn { color: var(--orange); }
+  .status--err { color: var(--red); }
+
+  /* ---------- Sheets ---------- */
+  .sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.35); opacity: 0; transition: opacity .25s; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; top: calc(env(safe-area-inset-top) + 12px); z-index: 31;
+    max-width: 680px; margin: 0 auto; background: var(--bg); border-radius: 12px 12px 0 0;
+    display: flex; flex-direction: column; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.9,.3,1);
+  }
+  .sheet.open { transform: none; }
+  .sheet-backdrop.open { opacity: 1; }
+  .sheet__bar {
+    flex: none; height: 56px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 16px;
+    border-bottom: .5px solid var(--sep);
+  }
+  .sheet__bar h2 { margin: 0; font-size: 17px; font-weight: 600; text-align: center; }
+  .sheet__bar .bar-btn:last-child { justify-self: end; font-weight: 600; }
+  .sheet__body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px 16px calc(30px + env(safe-area-inset-bottom)); }
+
+  .field { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 17px; padding: 0; text-align: right; color: var(--label); }
+  .field--left { text-align: left; }
+  .field::placeholder { color: var(--label-3); }
+  textarea.field { text-align: left; resize: vertical; min-height: 80px; }
+  .cell__label { flex: none; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+  .chip {
+    height: 32px; padding: 0 14px; border-radius: 16px; background: var(--fill); font-size: 15px; letter-spacing: -0.24px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .chip[aria-pressed="true"] { background: var(--tint); color: #fff; font-weight: 500; }
+  .chip--add { color: var(--tint); background: none; border: 1px dashed var(--fill-2); }
+
+  .stepper { display: inline-flex; align-items: center; background: var(--fill); border-radius: 8px; height: 32px; }
+  .stepper button { width: 44px; height: 32px; font-size: 22px; line-height: 1; color: var(--label); }
+  .stepper button + span, .stepper span + button { border-left: .5px solid var(--sep); }
+  .stepper span { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .store { padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; }
+  .store + .store { border-top: .5px solid var(--sep); }
+  .store__name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .tag-best { white-space: nowrap; font-size: 12px; font-weight: 600; letter-spacing: 0; color: #fff; background: var(--green); border-radius: 6px; padding: 2px 7px; }
+  .store__price { display: flex; align-items: center; gap: 4px; background: var(--fill); border-radius: 8px; padding: 0 10px; height: 36px; width: 120px; }
+  .store__price input { width: 100%; border: 0; outline: 0; background: none; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .store__link { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+  .store__link input {
+    flex: 1; min-width: 0; height: 36px; border-radius: 8px; border: 0; outline: 0; background: var(--fill); padding: 0 10px; font-size: 15px;
+  }
+  .store__link a { font-size: 15px; white-space: nowrap; }
+  .store__meta { grid-column: 1 / -1; font-size: 13px; color: var(--label-2); letter-spacing: -0.08px; }
+
+  .destructive { color: var(--red); justify-content: center; }
+  .tint-btn { color: var(--tint); justify-content: center; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const VERSION = '/*VERSION*/';
+const DEFAULT_REPO = 'orzull/boardgames-data';
+const DATA_PATH = 'games.json';
+
+const TYPES = ['Euro', 'Party', 'Familiar', 'Cooperativo', 'Temático', 'Abstracto', 'Filler', 'Deckbuilding', 'Roll & write', 'Legacy', 'Wargame', 'Puzzle', 'Deducción', 'Draft'];
+const DIFFICULTY = ['Baja', 'Media', 'Alta'];
+const COUNTS = [1, 2, 3, 4, 5, 6];   // 6 means "6 o más"
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const euro = n => n == null || n === '' || isNaN(n) ? '' : Number(n).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const countLabel = n => n >= 6 ? '6+' : String(n);
+
+const ICON = {
+  chev: '<svg class="chev" viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg class="owned-dot" viewBox="0 0 20 20" aria-label="Lo tengo"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M5.8 10.3 8.7 13l5.5-6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  search: '<svg viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="5.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m10.8 10.8 3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  filter: '<svg viewBox="0 0 22 22"><path d="M3 6h16M6 11h10M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  plus: '<svg viewBox="0 0 22 22"><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  gear: '<svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 1.8v2.6M11 17.6v2.6M1.8 11h2.6M17.6 11h2.6M4.5 4.5l1.8 1.8M15.7 15.7l1.8 1.8M4.5 17.5l1.8-1.8M15.7 6.3l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+};
+
+// ---------- State ----------
+const state = {
+  games: store.get('games', []),          // includes tombstones { id, deleted: true, updatedAt }
+  sha: store.get('sha', null),
+  dirty: store.get('dirty', false),       // local changes not yet saved to GitHub
+  sync: 'idle',                           // idle | loading | saving | saved | error | offline | notoken
+  syncMsg: '',
+  view: store.get('view', 'all'),         // all | want | own
+  query: '',
+  filters: store.get('filters', { types: [], difficulty: [], players: null, best: null, sort: 'name' }),
+};
+const token = () => store.get('token', '');
+const repo = () => store.get('repo', DEFAULT_REPO);
+const liveGames = () => state.games.filter(g => !g.deleted);
+
+function persistLocal() {
+  store.set('games', state.games); store.set('sha', state.sha); store.set('dirty', state.dirty);
+}
+
+// ---------- GitHub sync (private data repo) ----------
+const b64encode = s => btoa(unescape(encodeURIComponent(s)));
+const b64decode = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ''))));
+
+async function gh(method, body) {
+  const r = await fetch(`https://api.github.com/repos/${repo()}/contents/${DATA_PATH}`, {
+    method, cache: 'no-store',
+    headers: { Authorization: `Bearer ${token()}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+    body: body && JSON.stringify(body),
+  });
+  if (r.status === 404 && method === 'GET') return { missing: true };
+  if (!r.ok) { const e = new Error((await r.json().catch(() => ({}))).message || r.statusText); e.status = r.status; throw e; }
+  return r.json();
+}
+
+// Union by id; the newest updatedAt wins (deletions are tombstones, so they win too)
+function merge(a, b) {
+  const map = new Map();
+  for (const g of [...a, ...b]) {
+    const cur = map.get(g.id);
+    if (!cur || (g.updatedAt || '') > (cur.updatedAt || '')) map.set(g.id, g);
+  }
+  return [...map.values()];
+}
+
+async function pull() {
+  if (!token()) return setSync('notoken');
+  setSync('loading');
+  try {
+    const res = await gh('GET');
+    const remote = res.missing ? [] : (JSON.parse(b64decode(res.content)).games || []);
+    state.sha = res.missing ? null : res.sha;
+    state.games = state.dirty ? merge(remote, state.games) : remote;
+    persistLocal(); render();
+    if (state.dirty) await push(); else setSync('saved');
+  } catch (e) { handleSyncError(e); }
+}
+
+let pushTimer;
+function schedulePush() {
+  state.dirty = true; persistLocal();
+  if (!token()) return setSync('notoken');
+  clearTimeout(pushTimer); pushTimer = setTimeout(push, 700);
+  setSync('saving');
+}
+async function push(retry = true) {
+  if (!token()) return setSync('notoken');
+  setSync('saving');
+  try {
+    const content = JSON.stringify({ games: state.games.sort((x, y) => x.id.localeCompare(y.id)) }, null, 1) + '\n';
+    const res = await gh('PUT', { message: 'Actualiza juegos', content: b64encode(content), ...(state.sha ? { sha: state.sha } : {}) });
+    state.sha = res.content.sha; state.dirty = false; persistLocal(); setSync('saved');
+  } catch (e) {
+    // someone else saved first (another device): fetch, merge and try again
+    if (retry && (e.status === 409 || e.status === 422)) {
+      const res = await gh('GET').catch(() => null);
+      if (res && !res.missing) { state.sha = res.sha; state.games = merge(JSON.parse(b64decode(res.content)).games || [], state.games); persistLocal(); render(); }
+      return push(false);
+    }
+    handleSyncError(e);
+  }
+}
+function handleSyncError(e) {
+  if (!navigator.onLine || e instanceof TypeError) return setSync('offline');
+  if (e.status === 401) return setSync('error', 'El token no es válido o ha caducado');
+  if (e.status === 403 || e.status === 404) return setSync('error', `El token no tiene acceso a ${repo()}`);
+  setSync('error', e.message);
+}
+function setSync(s, msg = '') { state.sync = s; state.syncMsg = msg; const el = $('#status'); if (el) el.outerHTML = statusHTML(); }
+function statusHTML() {
+  const pending = state.dirty ? ' · cambios pendientes de guardar' : '';
+  const m = {
+    idle: ['', ''], loading: ['Cargando…', ''], saving: ['Guardando…', ''], saved: ['Guardado en GitHub', ''],
+    offline: ['Sin conexión' + pending, 'status--warn'],
+    notoken: ['Solo en este dispositivo · añade tu token en Ajustes para guardar en GitHub', 'status--warn'],
+    error: [(state.syncMsg || 'Error al guardar') + pending, 'status--err'],
+  }[state.sync];
+  return `<div id="status" class="status ${m[1]}">${esc(m[0])}</div>`;
+}
+window.addEventListener('online', () => state.dirty && push());
+
+// ---------- Filtering ----------
+function bestPrice(g) {
+  const offers = [['Mathom', g.mathomPrice], ['Amazon', g.amazonPrice]].filter(([, p]) => p != null && p !== '' && !isNaN(p));
+  if (!offers.length) return null;
+  offers.sort((a, b) => a[1] - b[1]);
+  return { store: offers[0][0], price: Number(offers[0][1]), other: offers[1] && Number(offers[1][1]) };
+}
+function activeFilterCount() {
+  const f = state.filters;
+  return f.types.length + f.difficulty.length + (f.players ? 1 : 0) + (f.best ? 1 : 0);
+}
+function visibleGames() {
+  const f = state.filters, q = state.query.trim().toLowerCase();
+  let list = liveGames().filter(g =>
+    (state.view === 'all' || (state.view === 'own') === !!g.owned) &&
+    (!q || g.name.toLowerCase().includes(q) || (g.types || []).some(t => t.toLowerCase().includes(q))) &&
+    (!f.types.length || f.types.some(t => (g.types || []).includes(t))) &&
+    (!f.difficulty.length || f.difficulty.includes(g.difficulty)) &&
+    (!f.players || ((g.minPlayers || 1) <= f.players && (f.players >= 6 ? (g.maxPlayers || 0) >= 6 : (g.maxPlayers || 99) >= f.players))) &&
+    (!f.best || (g.bestWith || []).includes(f.best))
+  );
+  const by = {
+    name: (a, b) => a.name.localeCompare(b.name, 'es'),
+    price: (a, b) => (bestPrice(a)?.price ?? 1e9) - (bestPrice(b)?.price ?? 1e9),
+    recent: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''),
+  }[f.sort] || ((a, b) => a.name.localeCompare(b.name, 'es'));
+  return list.sort(by);
+}
+
+function subtitle(g) {
+  const parts = [];
+  if ((g.types || []).length) parts.push(g.types.join(', '));
+  if (g.minPlayers || g.maxPlayers) {
+    const min = g.minPlayers || 1, max = g.maxPlayers;
+    parts.push(max && max !== min ? `${min}–${countLabel(max)} j.` : `${countLabel(min)} j.`);
+  }
+  if (g.difficulty) parts.push(g.difficulty);
+  return parts.join(' · ');
+}
+
+// ---------- Main list ----------
+const app = $('#app');
+function render() {
+  const games = visibleGames();
+  const total = liveGames().length;
+  const n = activeFilterCount();
+  const row = g => {
+    const bp = bestPrice(g);
+    return `<button class="cell" data-open="${g.id}">
+      <div class="cell__main">
+        <div class="cell__title"><span>${esc(g.name)}</span>${g.owned && state.view === 'all' ? ICON.check : ''}</div>
+        <div class="cell__sub">${esc(subtitle(g)) || '&nbsp;'}</div>
+      </div>
+      ${bp && !g.owned ? `<div class="price"><b>${euro(bp.price)}</b><small>${bp.store}</small></div>` : ''}
+      ${ICON.chev}
+    </button>`;
+  };
+  let listHTML;
+  if (!total) listHTML = `<div class="empty"><b>Aún no hay juegos</b>Pulsa + para añadir el primero.</div>`;
+  else if (!games.length) listHTML = `<div class="empty"><b>Sin resultados</b>Prueba con otra búsqueda o quita filtros.</div>`;
+  else if (state.view === 'all' && state.filters.sort === 'name') {
+    const want = games.filter(g => !g.owned), own = games.filter(g => g.owned);
+    listHTML = [[`Me interesa`, want], [`Lo tengo`, own]].filter(([, l]) => l.length)
+      .map(([h, l]) => `<div class="section-header">${h} · ${l.length}</div><div class="group">${l.map(row).join('')}</div>`).join('');
+  } else listHTML = `<div class="section-header">${games.length} ${games.length === 1 ? 'juego' : 'juegos'}</div><div class="group">${games.map(row).join('')}</div>`;
+
+  app.innerHTML = `
+    <header class="navbar">
+      <div class="navbar__row">
+        <button class="bar-btn" data-act="settings" aria-label="Ajustes">${ICON.gear}</button>
+        <div class="navbar__small">Juegos</div>
+        <div style="display:flex;gap:6px">
+          <button class="bar-btn bar-btn--right" data-act="filters" aria-label="Filtros">${n ? `<span class="badge">${n}</span>` : ''}${ICON.filter}</button>
+          <button class="bar-btn bar-btn--right" data-act="new" aria-label="Añadir juego">${ICON.plus}</button>
+        </div>
+      </div>
+    </header>
+    <main class="page">
+      <h1 class="large-title">Juegos</h1>
+      <label class="search">${ICON.search}<input type="search" id="q" placeholder="Buscar" value="${esc(state.query)}" autocomplete="off"></label>
+      <div class="segmented" role="tablist">
+        ${[['all', 'Todos'], ['want', 'Me interesa'], ['own', 'Lo tengo']].map(([v, l]) => `<button data-view="${v}" aria-pressed="${state.view === v}">${l}</button>`).join('')}
+      </div>
+      <div id="list">${listHTML}</div>
+      ${statusHTML()}
+    </main>`;
+  const q = $('#q');
+  q.oninput = () => { state.query = q.value; const pos = q.selectionStart; render(); const nq = $('#q'); nq.focus(); nq.setSelectionRange(pos, pos); };
+  onScroll();
+}
+function onScroll() { $('.navbar')?.classList.toggle('scrolled', window.scrollY > 40); }
+window.addEventListener('scroll', onScroll, { passive: true });
+
+app.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-view],[data-open]');
+  if (!t) return;
+  if (t.dataset.view) { state.view = t.dataset.view; store.set('view', state.view); render(); }
+  else if (t.dataset.open) openGame(state.games.find(g => g.id === t.dataset.open));
+  else if (t.dataset.act === 'new') openGame(null);
+  else if (t.dataset.act === 'filters') openFilters();
+  else if (t.dataset.act === 'settings') openSettings();
+});
+
+// ---------- Sheets ----------
+function openSheet({ title, left = 'Cancelar', right = 'Hecho', body, onRight, onLeft }) {
+  const back = document.createElement('div'); back.className = 'sheet-backdrop';
+  const sheet = document.createElement('section'); sheet.className = 'sheet'; sheet.setAttribute('role', 'dialog');
+  sheet.innerHTML = `
+    <div class="sheet__bar">
+      <button class="bar-btn" data-sheet="left">${left}</button>
+      <h2>${esc(title)}</h2>
+      <button class="bar-btn bar-btn--right" data-sheet="right">${right}</button>
+    </div>
+    <div class="sheet__body"></div>`;
+  document.body.append(back, sheet);
+  document.documentElement.style.overflow = 'hidden';
+  const close = () => {
+    sheet.classList.remove('open'); back.classList.remove('open');
+    document.documentElement.style.overflow = '';
+    setTimeout(() => { back.remove(); sheet.remove(); }, 320);
+  };
+  const bodyEl = $('.sheet__body', sheet);
+  const api = { el: bodyEl, sheet, close, rerender: () => { bodyEl.innerHTML = body(); } };
+  api.rerender();
+  $('[data-sheet="left"]', sheet).onclick = () => { onLeft?.(api); close(); };
+  $('[data-sheet="right"]', sheet).onclick = () => { if (onRight?.(api) !== false) close(); };
+  back.onclick = () => { onLeft?.(api); close(); };
+  sheet.getBoundingClientRect(); // force layout so the slide-up transition runs
+  sheet.classList.add('open'); back.classList.add('open');
+  return api;
+}
+const chip = (label, pressed, attrs) => `<button class="chip" aria-pressed="${!!pressed}" ${attrs}>${esc(label)}</button>`;
+const allTypes = () => [...new Set([...TYPES, ...liveGames().flatMap(g => g.types || [])])];
+
+// Game editor
+function openGame(game) {
+  const isNew = !game;
+  const g = structuredClone(game || { id: uid(), name: '', owned: state.view === 'own', types: [], difficulty: '', minPlayers: null, maxPlayers: null, bestWith: [], notes: '' });
+  const today = () => new Date().toISOString().slice(0, 10);
+  const searchQ = () => encodeURIComponent(g.name || '');
+  const ago = d => {
+    if (!d) return '';
+    const days = Math.round((Date.now() - new Date(d)) / 864e5);
+    return days <= 0 ? 'actualizado hoy' : days === 1 ? 'actualizado ayer' : `actualizado hace ${days} días`;
+  };
+  const storeBlock = (key, label, searchUrl) => {
+    const bp = bestPrice(g);
+    const isBest = bp && bp.other != null && bp.store === label && bp.price < bp.other;
+    return `<div class="store">
+      <div class="store__name">${label}${isBest ? '<span class="tag-best">Más barato</span>' : ''}</div>
+      <label class="store__price"><input inputmode="decimal" data-price="${key}" placeholder="—" value="${g[key + 'Price'] == null ? '' : Number(g[key + 'Price']).toFixed(2).replace('.', ',')}">€</label>
+      <div class="store__link">
+        <input type="url" data-url="${key}" placeholder="Enlace al producto" value="${esc(g[key + 'Url'] || '')}">
+        ${g[key + 'Url'] ? `<a href="${esc(g[key + 'Url'])}" target="_blank" rel="noopener">Abrir</a>` : `<a href="${searchUrl}${searchQ()}" target="_blank" rel="noopener">Buscar</a>`}
+      </div>
+      ${g[key + 'PriceAt'] || isBest ? `<div class="store__meta">${[isBest ? `${euro(bp.other - bp.price)} menos que ${label === 'Mathom' ? 'Amazon' : 'Mathom'}` : '', ago(g[key + 'PriceAt'])].filter(Boolean).join(' · ')}</div>` : ''}
+    </div>`;
+  };
+  const stepper = (key, label) => `<div class="cell"><span class="cell__main">${label}</span>
+    <div class="stepper"><button data-step="${key}" data-d="-1" aria-label="Menos">−</button><span>${g[key] ? countLabel(g[key]) : '<i style="color:var(--label-3);font-style:normal">·</i>'}</span><button data-step="${key}" data-d="1" aria-label="Más">+</button></div></div>`;
+
+  const body = () => `
+    <div class="group">
+      <div class="cell"><input class="field field--left" data-name placeholder="Nombre del juego" value="${esc(g.name)}" autocomplete="off"></div>
+    </div>
+    <div class="segmented">
+      <button data-owned="0" aria-pressed="${!g.owned}">Me interesa</button>
+      <button data-owned="1" aria-pressed="${!!g.owned}">Lo tengo</button>
+    </div>
+
+    <div class="section-header">Tipo</div>
+    <div class="group"><div class="chips">
+      ${allTypes().map(t => chip(t, g.types.includes(t), `data-type="${esc(t)}"`)).join('')}
+      <button class="chip chip--add" data-addtype>+ Otro</button>
+    </div></div>
+
+    <div class="section-header">Dificultad</div>
+    <div class="group"><div class="chips">${DIFFICULTY.map(d => chip(d, g.difficulty === d, `data-diff="${d}"`)).join('')}</div></div>
+
+    <div class="section-header">Jugadores</div>
+    <div class="group">${stepper('minPlayers', 'Mínimo')}${stepper('maxPlayers', 'Máximo')}</div>
+
+    <div class="section-header">Mejor con</div>
+    <div class="group"><div class="chips">${COUNTS.map(c => chip(c >= 6 ? '6+ jugadores' : c === 1 ? '1 jugador' : `${c} jugadores`, g.bestWith.includes(c), `data-best="${c}"`)).join('')}</div></div>
+
+    <div class="section-header">Precios</div>
+    <div class="group">
+      ${storeBlock('mathom', 'Mathom', 'https://mathom.es/es/buscar?s=')}
+      ${storeBlock('amazon', 'Amazon', 'https://www.amazon.es/s?k=')}
+    </div>
+
+    <div class="section-header">Notas</div>
+    <div class="group"><div class="cell"><textarea class="field" data-notes placeholder="Expansiones, dónde lo vi, quién lo recomendó…">${esc(g.notes)}</textarea></div></div>
+
+    ${isNew ? '' : `<div class="group"><button class="cell destructive" data-delete>Eliminar juego</button></div>`}`;
+
+  const api = openSheet({
+    title: isNew ? 'Nuevo juego' : g.name, right: isNew ? 'Añadir' : 'Guardar', body,
+    onRight: () => {
+      g.name = g.name.trim();
+      if (!g.name) { $('[data-name]', api.el).focus(); return false; }
+      const now = new Date().toISOString();
+      g.updatedAt = now; if (isNew) g.createdAt = now;
+      state.games = state.games.filter(x => x.id !== g.id).concat(g);
+      persistLocal(); render(); schedulePush();
+    },
+  });
+  if (isNew) setTimeout(() => $('[data-name]', api.el)?.focus(), 350);
+
+  const el = api.el;
+  const keepScroll = fn => { const y = el.scrollTop; fn(); api.rerender(); el.scrollTop = y; };
+  el.addEventListener('input', e => {
+    const t = e.target;
+    if (t.matches('[data-name]')) g.name = t.value;
+    else if (t.matches('[data-notes]')) g.notes = t.value;
+    else if (t.dataset.url) g[t.dataset.url + 'Url'] = t.value.trim();
+    else if (t.dataset.price) {
+      const v = t.value.replace(',', '.').replace(/[^\d.]/g, '');
+      g[t.dataset.price + 'Price'] = v === '' ? null : Number(v);
+      g[t.dataset.price + 'PriceAt'] = v === '' ? null : today();
+    }
+  });
+  // re-render on blur of price/url so the "Más barato" badge and links update
+  el.addEventListener('change', e => { if (e.target.dataset.price || e.target.dataset.url) keepScroll(() => {}); });
+  el.addEventListener('click', e => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.owned) keepScroll(() => { g.owned = t.dataset.owned === '1'; });
+    else if (t.dataset.type) keepScroll(() => { const x = t.dataset.type; g.types = g.types.includes(x) ? g.types.filter(y => y !== x) : [...g.types, x]; });
+    else if (t.hasAttribute('data-addtype')) {
+      const x = (prompt('Nuevo tipo de juego') || '').trim();
+      if (x) keepScroll(() => { if (!g.types.includes(x)) g.types.push(x); });
+    }
+    else if (t.dataset.diff) keepScroll(() => { g.difficulty = g.difficulty === t.dataset.diff ? '' : t.dataset.diff; });
+    else if (t.dataset.best) keepScroll(() => { const c = +t.dataset.best; g.bestWith = g.bestWith.includes(c) ? g.bestWith.filter(y => y !== c) : [...g.bestWith, c].sort(); });
+    else if (t.dataset.step) keepScroll(() => {
+      const k = t.dataset.step, v = Math.max(0, Math.min(6, (g[k] || 0) + +t.dataset.d)) || null;
+      g[k] = v;
+      if (k === 'minPlayers' && v && g.maxPlayers && g.maxPlayers < v) g.maxPlayers = v;
+      if (k === 'maxPlayers' && v && g.minPlayers && g.minPlayers > v) g.minPlayers = v;
+    });
+    else if (t.hasAttribute('data-delete')) {
+      if (!confirm(`¿Eliminar «${g.name}»?`)) return;
+      state.games = state.games.filter(x => x.id !== g.id).concat({ id: g.id, deleted: true, updatedAt: new Date().toISOString() });
+      persistLocal(); render(); schedulePush(); api.close();
+    }
+  });
+}
+
+// Filters
+function openFilters() {
+  const f = structuredClone(state.filters);
+  const toggle = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+  const body = () => `
+    <div class="section-header">Ordenar por</div>
+    <div class="segmented">
+      ${[['name', 'Nombre'], ['price', 'Precio'], ['recent', 'Recientes']].map(([v, l]) => `<button data-sort="${v}" aria-pressed="${f.sort === v}">${l}</button>`).join('')}
+    </div>
+    <div class="section-header">Tipo</div>
+    <div class="group"><div class="chips">${allTypes().map(t => chip(t, f.types.includes(t), `data-type="${esc(t)}"`)).join('')}</div></div>
+    <div class="section-header">Dificultad</div>
+    <div class="group"><div class="chips">${DIFFICULTY.map(d => chip(d, f.difficulty.includes(d), `data-diff="${d}"`)).join('')}</div></div>
+    <div class="section-header">Se puede jugar con</div>
+    <div class="group"><div class="chips">${COUNTS.map(c => chip(countLabel(c), f.players === c, `data-players="${c}"`)).join('')}</div></div>
+    <div class="section-header">Mejor con</div>
+    <div class="group"><div class="chips">${COUNTS.map(c => chip(countLabel(c), f.best === c, `data-best="${c}"`)).join('')}</div></div>
+    <div class="section-footer" style="margin:-23px 0 30px">Los tipos muestran juegos que tengan cualquiera de los elegidos.</div>`;
+  const api = openSheet({
+    title: 'Filtros', left: 'Restablecer', body,
+    onLeft: () => {},  // backdrop tap = keep filters as they were
+    onRight: () => { state.filters = f; store.set('filters', f); render(); },
+  });
+  // "Restablecer" clears instead of cancelling
+  $('[data-sheet="left"]', api.sheet).onclick = () => {
+    Object.assign(f, { types: [], difficulty: [], players: null, best: null }); api.rerender();
+  };
+  api.el.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.sort) f.sort = t.dataset.sort;
+    else if (t.dataset.type) f.types = toggle(f.types, t.dataset.type);
+    else if (t.dataset.diff) f.difficulty = toggle(f.difficulty, t.dataset.diff);
+    else if (t.dataset.players) f.players = f.players === +t.dataset.players ? null : +t.dataset.players;
+    else if (t.dataset.best) f.best = f.best === +t.dataset.best ? null : +t.dataset.best;
+    else return;
+    api.rerender();
+  });
+}
+
+// Settings
+function openSettings() {
+  let tok = token(), rep = repo();
+  const body = () => `
+    <div class="section-header">Guardar en GitHub</div>
+    <div class="group">
+      <div class="cell"><span class="cell__label">Repositorio</span><input class="field" data-repo value="${esc(rep)}" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+      <div class="cell"><span class="cell__label">Token</span><input class="field" type="password" data-token value="${esc(tok)}" placeholder="github_pat_…" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    </div>
+    <div class="section-footer" style="margin:-23px 0 30px">Token de GitHub con acceso solo a ese repositorio (Contents: Read and write). Se guarda solo en este dispositivo.</div>
+    <div class="group">
+      <button class="cell tint-btn" data-export>Exportar copia (JSON)</button>
+    </div>
+    <div class="section-footer" style="margin:-23px 0 30px">${liveGames().length} juegos · versión ${new Date(VERSION).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>`;
+  const api = openSheet({
+    title: 'Ajustes', body, right: 'Guardar',
+    onRight: () => {
+      const changed = tok.trim() !== token() || rep.trim() !== repo();
+      store.set('token', tok.trim()); store.set('repo', rep.trim() || DEFAULT_REPO);
+      if (changed) { state.sha = null; pull(); }
+    },
+  });
+  api.el.addEventListener('input', e => {
+    if (e.target.matches('[data-token]')) tok = e.target.value;
+    if (e.target.matches('[data-repo]')) rep = e.target.value;
+  });
+  api.el.addEventListener('click', e => {
+    if (!e.target.closest('[data-export]')) return;
+    const blob = new Blob([JSON.stringify({ games: liveGames() }, null, 1)], { type: 'application/json' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `juegos-${new Date().toISOString().slice(0, 10)}.json` });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+}
+
+// ---------- Updates (home-screen apps have no reload button) ----------
+async function checkForUpdate() {
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    const { version } = await r.json();
+    if (version && version !== VERSION && !sessionStorage.getItem('reloaded-for-' + version)) {
+      sessionStorage.setItem('reloaded-for-' + version, '1');
+      await fetch('./', { cache: 'reload' });
+      location.reload();
+    }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { checkForUpdate(); if (!state.dirty) pull(); }
+});
+
+render();
+checkForUpdate();
+pull();
+</script>
+</body>
+</html>
