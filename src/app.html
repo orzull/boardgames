@@ -99,6 +99,14 @@
   .group + .section-footer { margin-top: -23px; margin-bottom: 30px; }
   .cell { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 11px 16px; width: 100%; text-align: left; }
   .cell + .cell::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--sep); }
+  .cell:has(.thumb) + .cell:has(.thumb)::before { left: 80px; }
+  .thumb {
+    width: 52px; height: 52px; flex: none; border-radius: 10px; background: #fff; overflow: hidden;
+    display: grid; place-items: center; box-shadow: inset 0 0 0 .5px var(--sep);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .thumb--empty { background: var(--fill); color: var(--label-2); font-weight: 600; font-size: 20px; }
+  .thumb-lg { width: 132px; height: 132px; border-radius: 18px; margin: 0 auto 18px; font-size: 44px; }
   button.cell:active, a.cell:active { background: var(--fill-2); }
   .cell__main { flex: 1; min-width: 0; }
   .cell__title { display: flex; align-items: center; gap: 6px; }
@@ -342,6 +350,14 @@ function visibleGames() {
   return list.sort(by);
 }
 
+// Box art thumbnail (product photos have white backgrounds, so the tile stays white in dark mode too)
+function thumbHTML(g, cls = 'thumb') {
+  const initial = esc((g.name || '?').trim().charAt(0).toUpperCase());
+  return g.image
+    ? `<div class="${cls}"><img src="${esc(g.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('thumb--empty');this.parentNode.textContent='${initial}'"></div>`
+    : `<div class="${cls} thumb--empty">${initial}</div>`;
+}
+
 function subtitle(g) {
   const parts = [];
   if ((g.types || []).length) parts.push(g.types.join(', '));
@@ -362,6 +378,7 @@ function render() {
   const row = g => {
     const bp = bestPrice(g);
     return `<button class="cell" data-open="${g.id}">
+      ${thumbHTML(g)}
       <div class="cell__main">
         <div class="cell__title"><span>${esc(g.name)}</span>${g.owned && state.view === 'all' ? ICON.check : ''}</div>
         <div class="cell__sub">${esc(subtitle(g)) || '&nbsp;'}</div>
@@ -482,9 +499,11 @@ function openGame(game) {
     <div class="stepper"><button data-step="${key}" data-d="-1" aria-label="Menos">−</button><span>${g[key] ? countLabel(g[key]) : '<i style="color:var(--label-3);font-style:normal">·</i>'}</span><button data-step="${key}" data-d="1" aria-label="Más">+</button></div></div>`;
 
   const body = () => `
+    ${thumbHTML(g, 'thumb thumb-lg')}
     <div class="group">
       <div class="cell"><input class="field field--left" data-name placeholder="Nombre del juego" value="${esc(g.name)}" autocomplete="off"></div>
       <div class="cell"><input class="field field--left" data-orig placeholder="Nombre original (opcional)" value="${esc(g.originalName || '')}" autocomplete="off"></div>
+      <div class="cell"><input class="field field--left" type="url" data-image placeholder="URL de la imagen (opcional)" value="${esc(g.image || '')}" autocapitalize="off" autocorrect="off"></div>
     </div>
     <div class="segmented">
       <button data-owned="0" aria-pressed="${!g.owned}">Me interesa</button>
@@ -539,6 +558,7 @@ function openGame(game) {
     else if (t.dataset.url) g[t.dataset.url + 'Url'] = t.value.trim();
     else if (t.dataset.lang) g[t.dataset.lang + 'Lang'] = t.value || null;
     else if (t.matches('[data-orig]')) g.originalName = t.value;
+    else if (t.matches('[data-image]')) g.image = t.value.trim();
     else if (t.dataset.price) {
       const v = t.value.replace(',', '.').replace(/[^\d.]/g, '');
       g[t.dataset.price + 'Price'] = v === '' ? null : Number(v);
@@ -546,7 +566,7 @@ function openGame(game) {
     }
   });
   // re-render on blur of price/url so the "Más barato" badge and links update
-  el.addEventListener('change', e => { if (e.target.dataset.price || e.target.dataset.url || e.target.dataset.lang) keepScroll(() => {}); });
+  el.addEventListener('change', e => { if (e.target.dataset.price || e.target.dataset.url || e.target.dataset.lang || e.target.matches('[data-image]')) keepScroll(() => {}); });
   el.addEventListener('click', e => {
     const t = e.target.closest('button');
     if (!t) return;
