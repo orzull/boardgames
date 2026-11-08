@@ -153,11 +153,18 @@
   .stepper button + span, .stepper span + button { border-left: .5px solid var(--sep); }
   .stepper span { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
 
-  .store { padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; }
+  .store { padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 8px; align-items: center; }
   .store + .store { border-top: .5px solid var(--sep); }
   .store__name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .tag-best { white-space: nowrap; font-size: 12px; font-weight: 600; letter-spacing: 0; color: #fff; background: var(--green); border-radius: 6px; padding: 2px 7px; }
-  .store__price { display: flex; align-items: center; gap: 4px; background: var(--fill); border-radius: 8px; padding: 0 10px; height: 36px; width: 120px; }
+  .lang-warn { color: var(--orange); }
+  .store { grid-template-columns: 1fr auto auto; }
+  .store__lang select {
+    -webkit-appearance: none; appearance: none; border: 0; background: var(--fill); color: inherit; font: inherit; font-size: 13px;
+    height: 36px; border-radius: 8px; padding: 0 8px; max-width: 112px;
+  }
+  .store__lang.lang-warn select { color: var(--orange); font-weight: 600; }
+  .store__price { display: flex; align-items: center; gap: 4px; background: var(--fill); border-radius: 8px; padding: 0 10px; height: 36px; width: 100px; }
   .store__price input { width: 100%; border: 0; outline: 0; background: none; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
   .store__link { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
   .store__link input {
@@ -178,7 +185,10 @@ const VERSION = '/*VERSION*/';
 const DEFAULT_REPO = 'orzull/boardgames-data';
 const DATA_PATH = 'games.json';
 
-const TYPES = ['Euro', 'Party', 'Familiar', 'Cooperativo', 'Temático', 'Abstracto', 'Filler', 'Deckbuilding', 'Roll & write', 'Legacy', 'Wargame', 'Puzzle', 'Deducción', 'Draft'];
+const TYPES = ['Euro', 'Party', 'Familiar', 'Cooperativo', 'Temático', 'Abstracto', 'Filler', 'Deckbuilding', 'Roll & write', 'Legacy', 'Wargame', 'Puzzle', 'Deducción', 'Draft', 'Expansión'];
+// Edition language per store. Spanish (or multilingual with Spanish, or no text) counts as "in Spanish".
+const LANGS = { es: 'Español', 'es/en': 'Español + inglés', ind: 'Sin texto', en: 'Inglés', fr: 'Francés', it: 'Italiano', de: 'Alemán' };
+const isSpanish = l => !l || l === 'es' || l === 'es/en' || l === 'ind';
 const DIFFICULTY = ['Baja', 'Media', 'Alta'];
 const COUNTS = [1, 2, 3, 4, 5, 6];   // 6 means "6 o más"
 
@@ -303,10 +313,12 @@ window.addEventListener('online', () => state.dirty && push());
 
 // ---------- Filtering ----------
 function bestPrice(g) {
-  const offers = [['Mathom', g.mathomPrice], ['Amazon', g.amazonPrice]].filter(([, p]) => p != null && p !== '' && !isNaN(p));
-  if (!offers.length) return null;
-  offers.sort((a, b) => a[1] - b[1]);
-  return { store: offers[0][0], price: Number(offers[0][1]), other: offers[1] && Number(offers[1][1]) };
+  const all = [['Mathom', g.mathomPrice, g.mathomLang], ['Amazon', g.amazonPrice, g.amazonLang]]
+    .filter(([, p]) => p != null && p !== '' && !isNaN(p)).map(([s, p, l]) => ({ store: s, price: Number(p), lang: l }));
+  if (!all.length) return null;
+  const spanish = all.filter(o => isSpanish(o.lang));
+  const pool = (spanish.length ? spanish : all).sort((a, b) => a.price - b.price);
+  return { ...pool[0], other: pool[1]?.price, otherStore: pool[1]?.store };
 }
 function activeFilterCount() {
   const f = state.filters;
@@ -316,7 +328,7 @@ function visibleGames() {
   const f = state.filters, q = state.query.trim().toLowerCase();
   let list = liveGames().filter(g =>
     (state.view === 'all' || (state.view === 'own') === !!g.owned) &&
-    (!q || g.name.toLowerCase().includes(q) || (g.types || []).some(t => t.toLowerCase().includes(q))) &&
+    (!q || g.name.toLowerCase().includes(q) || (g.originalName || '').toLowerCase().includes(q) || (g.types || []).some(t => t.toLowerCase().includes(q))) &&
     (!f.types.length || f.types.some(t => (g.types || []).includes(t))) &&
     (!f.difficulty.length || f.difficulty.includes(g.difficulty)) &&
     (!f.players || ((g.minPlayers || 1) <= f.players && (f.players >= 6 ? (g.maxPlayers || 0) >= 6 : (g.maxPlayers || 99) >= f.players))) &&
@@ -354,7 +366,7 @@ function render() {
         <div class="cell__title"><span>${esc(g.name)}</span>${g.owned && state.view === 'all' ? ICON.check : ''}</div>
         <div class="cell__sub">${esc(subtitle(g)) || '&nbsp;'}</div>
       </div>
-      ${bp && !g.owned ? `<div class="price"><b>${euro(bp.price)}</b><small>${bp.store}</small></div>` : ''}
+      ${bp && !g.owned ? `<div class="price"><b>${euro(bp.price)}</b><small>${bp.store}${isSpanish(bp.lang) ? '' : ` · <span class="lang-warn">${LANGS[bp.lang] || bp.lang}</span>`}</small></div>` : ''}
       ${ICON.chev}
     </button>`;
   };
@@ -449,14 +461,21 @@ function openGame(game) {
   const storeBlock = (key, label, searchUrl) => {
     const bp = bestPrice(g);
     const isBest = bp && bp.other != null && bp.store === label && bp.price < bp.other;
+    const lang = g[key + 'Lang'] || '';
     return `<div class="store">
       <div class="store__name">${label}${isBest ? '<span class="tag-best">Más barato</span>' : ''}</div>
+      <label class="store__lang ${lang && !isSpanish(lang) ? 'lang-warn' : ''}">
+        <select data-lang="${key}">
+          <option value="" ${!lang ? 'selected' : ''}>Idioma…</option>
+          ${Object.entries(LANGS).map(([v, l]) => `<option value="${v}" ${lang === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </label>
       <label class="store__price"><input inputmode="decimal" data-price="${key}" placeholder="—" value="${g[key + 'Price'] == null ? '' : Number(g[key + 'Price']).toFixed(2).replace('.', ',')}">€</label>
       <div class="store__link">
         <input type="url" data-url="${key}" placeholder="Enlace al producto" value="${esc(g[key + 'Url'] || '')}">
         ${g[key + 'Url'] ? `<a href="${esc(g[key + 'Url'])}" target="_blank" rel="noopener">Abrir</a>` : `<a href="${searchUrl}${searchQ()}" target="_blank" rel="noopener">Buscar</a>`}
       </div>
-      ${g[key + 'PriceAt'] || isBest ? `<div class="store__meta">${[isBest ? `${euro(bp.other - bp.price)} menos que ${label === 'Mathom' ? 'Amazon' : 'Mathom'}` : '', ago(g[key + 'PriceAt'])].filter(Boolean).join(' · ')}</div>` : ''}
+      ${g[key + 'PriceAt'] || isBest ? `<div class="store__meta">${[isBest ? `${euro(bp.other - bp.price)} menos que ${bp.otherStore}` : '', ago(g[key + 'PriceAt'])].filter(Boolean).join(' · ')}</div>` : ''}
     </div>`;
   };
   const stepper = (key, label) => `<div class="cell"><span class="cell__main">${label}</span>
@@ -465,6 +484,7 @@ function openGame(game) {
   const body = () => `
     <div class="group">
       <div class="cell"><input class="field field--left" data-name placeholder="Nombre del juego" value="${esc(g.name)}" autocomplete="off"></div>
+      <div class="cell"><input class="field field--left" data-orig placeholder="Nombre original (opcional)" value="${esc(g.originalName || '')}" autocomplete="off"></div>
     </div>
     <div class="segmented">
       <button data-owned="0" aria-pressed="${!g.owned}">Me interesa</button>
@@ -517,6 +537,8 @@ function openGame(game) {
     if (t.matches('[data-name]')) g.name = t.value;
     else if (t.matches('[data-notes]')) g.notes = t.value;
     else if (t.dataset.url) g[t.dataset.url + 'Url'] = t.value.trim();
+    else if (t.dataset.lang) g[t.dataset.lang + 'Lang'] = t.value || null;
+    else if (t.matches('[data-orig]')) g.originalName = t.value;
     else if (t.dataset.price) {
       const v = t.value.replace(',', '.').replace(/[^\d.]/g, '');
       g[t.dataset.price + 'Price'] = v === '' ? null : Number(v);
@@ -524,7 +546,7 @@ function openGame(game) {
     }
   });
   // re-render on blur of price/url so the "Más barato" badge and links update
-  el.addEventListener('change', e => { if (e.target.dataset.price || e.target.dataset.url) keepScroll(() => {}); });
+  el.addEventListener('change', e => { if (e.target.dataset.price || e.target.dataset.url || e.target.dataset.lang) keepScroll(() => {}); });
   el.addEventListener('click', e => {
     const t = e.target.closest('button');
     if (!t) return;
