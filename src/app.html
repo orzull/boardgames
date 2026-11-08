@@ -102,6 +102,16 @@
   .active-filters::-webkit-scrollbar { display: none; }
   .chip--active { flex: none; background: color-mix(in srgb, var(--tint) 14%, transparent); color: var(--tint); font-weight: 500; }
   .chip--active span { font-size: 17px; line-height: 1; margin-left: 2px; opacity: .8; }
+  .score {
+    display: inline-block; min-width: 26px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 0; font-variant-numeric: tabular-nums;
+    color: #fff; border-radius: 5px; padding: 1px 5px; margin-right: 5px; vertical-align: 1px;
+  }
+  .score--lg { font-size: 15px; padding: 3px 9px; border-radius: 7px; margin: 0; }
+  .score--buy { background: var(--green); }
+  .score--next { background: var(--tint); }
+  .score--later { background: #8e8e93; }
+  .score--doubt { background: var(--orange); }
+  .section-header .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; padding: 0; min-width: 0; margin: 0 6px 1px 0; vertical-align: middle; }
   .rank {
     display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums;
     color: var(--tint); background: color-mix(in srgb, var(--tint) 12%, transparent); border-radius: 5px; padding: 1px 5px; margin-right: 6px;
@@ -246,7 +256,10 @@ const state = {
   filters: store.get('filters', { types: [], difficulty: [], players: null, best: null, sort: 'name' }),
 };
 if (state.filters.sort === 'price') state.filters.sort = 'priceAsc';
-const SORTS = { name: 'Nombre', rank: 'Ranking BGG', priceAsc: 'Precio: más barato', priceDesc: 'Precio: más caro', recent: 'Añadidos recientemente' };
+const SORTS = { mine: 'Mi recomendación', name: 'Nombre', rank: 'Ranking BGG', priceAsc: 'Precio: más barato', priceDesc: 'Precio: más caro', recent: 'Añadidos recientemente' };
+// Claude's buying advice: score 0–100 → stage
+const TIERS = [['Comprar ya', 85, 'buy'], ['Siguiente', 70, 'next'], ['Más adelante', 55, 'later'], ['Dudoso', 0, 'doubt']];
+const tierOf = s => s == null ? null : TIERS.find(([, min]) => s >= min);
 const token = () => store.get('token', '');
 const repo = () => store.get('repo', DEFAULT_REPO);
 const liveGames = () => state.games.filter(g => !g.deleted);
@@ -365,6 +378,7 @@ function visibleGames() {
     priceDesc: (a, b) => (bestPrice(b)?.price ?? -1) - (bestPrice(a)?.price ?? -1),
     recent: (a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''),
     rank: (a, b) => (a.bggRank || 1e9) - (b.bggRank || 1e9),
+    mine: (a, b) => (b.owned ? -1 : b.myScore ?? -1) - (a.owned ? -1 : a.myScore ?? -1) || a.name.localeCompare(b.name, 'es'),
   }[f.sort] || ((a, b) => a.name.localeCompare(b.name, 'es'));
   return list.sort(by);
 }
@@ -400,7 +414,7 @@ function render() {
       ${thumbHTML(g)}
       <div class="cell__main">
         <div class="cell__title"><span>${esc(g.name)}</span>${g.owned && state.view === 'all' ? ICON.check : ''}</div>
-        <div class="cell__sub">${g.bggRank ? `<span class="rank" title="Ranking BGG">#${g.bggRank.toLocaleString('es-ES')}</span>` : ''}${esc(subtitle(g)) || '&nbsp;'}</div>
+        <div class="cell__sub">${!g.owned && g.myScore != null ? `<span class="score score--${tierOf(g.myScore)[2]}" title="Mi recomendación: ${tierOf(g.myScore)[0]}">${g.myScore}</span>` : ''}${g.bggRank ? `<span class="rank" title="Ranking BGG">#${g.bggRank.toLocaleString('es-ES')}</span>` : ''}${esc(subtitle(g)) || '&nbsp;'}</div>
       </div>
       ${bp && !g.owned ? `<div class="price"><b>${euro(bp.price)}</b><small>${bp.store}${isSpanish(bp.lang) ? '' : ` · <span class="lang-warn">${LANGS[bp.lang] || bp.lang}</span>`}</small></div>` : ''}
       ${ICON.chev}
@@ -413,8 +427,13 @@ function render() {
     const want = games.filter(g => !g.owned), own = games.filter(g => g.owned);
     listHTML = [[`Me interesa`, want], [`Lo tengo`, own]].filter(([, l]) => l.length)
       .map(([h, l]) => `<div class="section-header">${h} · ${l.length}</div><div class="group">${l.map(row).join('')}</div>`).join('');
+  } else if (state.filters.sort === 'mine') {
+    const groups = TIERS.map(([name, , cls]) => [name, games.filter(g => !g.owned && g.myScore != null && tierOf(g.myScore)[0] === name), cls]);
+    groups.push(['Lo tengo / sin nota', games.filter(g => g.owned || g.myScore == null), '']);
+    listHTML = groups.filter(([, l]) => l.length).map(([h, l, cls]) =>
+      `<div class="section-header">${cls ? `<span class="dot score--${cls}"></span>` : ''}${h} · ${l.length}</div><div class="group">${l.map(row).join('')}</div>`).join('');
   } else listHTML = `<div class="group">${games.map(row).join('')}</div>`;
-  const grouped = state.view === 'all' && state.filters.sort === 'name';
+  const grouped = (state.view === 'all' && state.filters.sort === 'name') || state.filters.sort === 'mine';
   const f = state.filters;
   const activeChips = [
     ...f.types.map(x => ['types', x, x]),
@@ -555,6 +574,11 @@ function openGame(game) {
         ${ICON.chev}
       </a>
     </div>` : ''}
+    ${!g.owned && g.myScore != null ? `<div class="section-header">Mi recomendación</div>
+    <div class="group">
+      <div class="cell"><span class="cell__main">${tierOf(g.myScore)[0]}</span><span class="score score--${tierOf(g.myScore)[2]} score--lg">${g.myScore}</span></div>
+    </div>
+    <div class="section-footer" style="margin:-23px 0 30px">${esc(g.myWhy || '')}</div>` : ''}
     <div class="segmented">
       <button data-owned="0" aria-pressed="${!g.owned}">Me interesa</button>
       <button data-owned="1" aria-pressed="${!!g.owned}">Lo tengo</button>
